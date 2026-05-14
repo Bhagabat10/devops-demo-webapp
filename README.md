@@ -20,7 +20,20 @@
 
 ## 1. Overview
 
-Production-grade infrastructure on **Microsoft Azure** with **Cloudflare at the edge**, covering:
+This document describes a scalable, secure, and resilient cloud architecture hosted in **Microsoft Azure** with **Cloudflare at the edge**.
+
+The platform is designed to support operational management, real-time device communication, large-scale telemetry ingestion, media processing, and customer engagement workloads across multiple venues and geographic regions.
+The solution emphasizes:
+
+- Secure and resilient edge delivery
+- Scalable API and event-driven backend services
+- High-throughput ingestion and processing pipelines
+- Reliable asynchronous communication between systems and devices
+- Efficient video processing and global content delivery
+- Enterprise-grade security and observability
+- Fully automated infrastructure provisioning and deployments
+
+Cloudflare provides global edge protection, caching, and traffic acceleration, while Azure delivers the core compute, data, messaging, and analytics services required to operate the platform at scale.
 
 | Capability | Solution |
 |---|---|
