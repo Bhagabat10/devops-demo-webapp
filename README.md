@@ -1,24 +1,14 @@
-# DevOps-Demo-WebApp
-This is a sample project used for learning the devops end to end concepts
-
-my intial commit 01/26
-my first project commit
-Adding something
-my 2nd project commit
-Hello bhagabat ...it is my fisrt whole DevOps with CI/CD project. 
-Webhook test
-
 # DevOps Infrastructure Design — Azure + Cloudflare
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
 2. [Architecture](#2-architecture)
-3. [Step-by-Step: Bootstrap & Prerequisites](#3-step-by-step-bootstrap--prerequisites)
-4. [Step-by-Step: Infrastructure as Code](#4-step-by-step-infrastructure-as-code)
-5. [Step-by-Step: Service Setup](#5-step-by-step-service-setup)
-6. [Step-by-Step: CI/CD Pipelines (Azure DevOps)](#6-step-by-step-cicd-pipelines-azure-devops)
-7. [Step-by-Step: Observability](#7-step-by-step-observability)
+3. [Bootstrap & Prerequisites](#3-bootstrap--prerequisites)
+4. [Infrastructure as Code](#4-infrastructure-as-code)
+5. [Service Setup](#5-service-setup)
+6. [CI/CD Pipelines (Azure DevOps)](#6-cicd-pipelines-azure-devops)
+7. [Observability](#7-observability)
 8. [Security](#8-security)
 9. [Scalability](#9-scalability)
 10. [Reliability & Resiliency](#10-reliability--resiliency)
@@ -108,7 +98,7 @@ Access only via Private Endpoints inside the VNet
 
 ---
 
-## 3. Step-by-Step: Bootstrap & Prerequisites
+## 3. Bootstrap & Prerequisites
 
 These steps are performed once by a platform engineer before any Terraform or pipelines run.
 
@@ -214,7 +204,7 @@ az acr replication create \
 
 ---
 
-## 4. Step-by-Step: Infrastructure as Code
+## 4. Infrastructure as Code
 
 ### Repo Structure
 
@@ -516,7 +506,7 @@ resource "azurerm_iothub_dps" "main" {
 
 ---
 
-## 5. Step-by-Step: Service Setup
+## 5. Service Setup
 
 ### Step 1 — Cloudflare DNS & WAF
 
@@ -599,7 +589,7 @@ Products:
 
 ---
 
-## 6. Step-by-Step: CI/CD Pipelines (Azure DevOps)
+## 6. CI/CD Pipelines (Azure DevOps)
 
 ### Pipeline Flow Overview
 
@@ -1070,7 +1060,7 @@ stages:
 
 ---
 
-## 7. Step-by-Step: Observability
+## 7. Observability
 
 ### Step 1 — Central Log Analytics Workspace
 
