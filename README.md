@@ -13,7 +13,7 @@
 9. [Scalability](#9-scalability)
 10. [Reliability & Resiliency](#10-reliability--resiliency)
 11. [Automation](#11-automation)
-12. [Assumptions & Trade-offs](#12-assumptions--trade-offs)
+12. [Assumptions ](#12-assumptions)
 13. [Key Architecture Decisions](#13-key-architecture-decisions)
 
 ---
@@ -1197,7 +1197,7 @@ RTO: < 15 minutes (Container Apps redeploy from ACR)
 
 ---
 
-## 12. Assumptions & Trade-offs
+## 12. Assumptions
 
 | Assumption | Trade-off |
 |---|---|
