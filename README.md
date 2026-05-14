@@ -4,7 +4,7 @@
 
 1. [Overview](#1-overview)
 2. [Architecture](#2-architecture)
-3. [Bootstrap & Prerequisites](#3-bootstrap--prerequisites)
+3. [Prerequisites](#3-prerequisites)
 4. [Infrastructure as Code](#4-infrastructure-as-code)
 5. [Service Setup](#5-service-setup)
 6. [CI/CD Pipelines (Azure DevOps)](#6-cicd-pipelines-azure-devops)
@@ -44,42 +44,60 @@ Production-grade infrastructure on **Microsoft Azure** with **Cloudflare at the 
 ╔══════════════════════════════════════════════════════════╗
 ║                    CLOUDFLARE EDGE                       ║
 ║   WAF · DDoS · CDN · DNS · Workers (JWT pre-auth)        ║
-╚══════════════╦═══════════════════════════════════════════╝
-               │ HTTPS (all public traffic)
-               ▼
-╔══════════════════════════════╗
-║   Azure API Management       ║  ← JWT validation, rate limiting,
-║   (APIM)                     ║    IP allow-list, versioning
-╚══════╦═══════════════╦═══════╝
-       │               │
-       ▼               ▼
-┌─────────────┐ ┌─────────────────────────────────────────┐
-│ Config Web  │ │           Backend APIs                   │
-│ App         │ │     (Azure Container Apps — KEDA)        │
-│ Static Web  │ └──────┬──────────────┬────────────────────┘
-│ Apps        │        │              │
-│ Entra ID    │        ▼              ▼
-└─────────────┘ ┌────────────┐  ┌─────────────────────────┐
-                │ Cosmos DB  │  │   Azure Service Bus      │
-                │ (primary   │  │   Queues & Topics        │
-                │  datastore)│  └──────┬──────────┬────────┘
-                └────────────┘         │          │
-                                       ▼          ▼
-                               ┌────────────┐ ┌──────────────────┐
-                               │    Log     │ │ Notification     │
-                               │ Processor  │ │ Worker           │
-                               │(Stream     │ │ SMS → ACS/Twilio │
-                               │ Analytics) │ │ Email → ACS/Grid │
-                               └────────────┘ └──────────────────┘
+╚══════════════════════════╦═══════════════════════════════╝
+                           │ HTTPS (all public traffic)
+                           ▼
+                ╔══════════════════════════════╗
+                ║   Azure API Management       ║
+                ║   (APIM)                     ║
+                ║  - JWT validation            ║
+                ║  - Rate limiting             ║
+                ║  - IP allow-list             ║
+                ║  - API versioning            ║
+                ╚══════╦═══════════════╦═══════╝
+                       │               │
+                       ▼               ▼
+          ┌────────────────┐    ┌──────────────────────────────────────┐
+          │ Config Web App │    │            Backend APIs              │
+          │ Azure Static   │    │   Azure Container Apps (KEDA)        │
+          │ Web Apps       │    └──────────┬─────────────┬─────────────┘
+          │ Entra ID Auth  │               │             │
+          └────────────────┘               ▼             ▼
+                                     ┌────────────┐   ┌──────────────────────┐
+                                     │ Cosmos DB  │   │ Azure Service Bus    │
+                                     │ Primary    │   │ Queues & Topics      │
+                                     │ Datastore  │   └─────────┬──────┬─────┘
+                                     └────────────┘             │      │
+                                                                ▼      ▼
+                                                       ┌────────────┐ ┌──────────────────┐
+                                                       │ Log        │ │ Notification     │
+                                                       │ Processor  │ │ Worker           │
+                                                       │ Stream     │ │ SMS → ACS/Twilio │
+                                                       │ Analytics  │ │ Email → ACS/Grid │
+                                                       └────────────┘ └──────────────────┘
 
 [In-Venue Devices]
-  ├── MQTT/AMQP ──────────────► Azure IoT Hub ──► Service Bus
-  └── HTTPS logs ─────────────► Event Hubs ──────► Stream Analytics
+  ├── MQTT/AMQP ───────────► Azure IoT Hub ──► Service Bus
+  └── HTTPS Logs ──────────► Event Hubs ─────► Stream Analytics
 
-[Video]
-  Raw clip → Blob (private) → Event Grid trigger
-           → Container App Job (FFmpeg)
-           → Blob (public HLS/DASH) → Cloudflare CDN
+
+[Video Processing Pipeline]
+  Raw Clip
+      │
+      ▼
+  Blob Storage (Private)
+      │
+      ▼
+  Event Grid Trigger
+      │
+      ▼
+  Container App Job (FFmpeg)
+      │
+      ▼
+  Blob Storage (Public HLS/DASH)
+      │
+      ▼
+  Cloudflare CDN
 ```
 
 ### Network Topology
@@ -98,7 +116,7 @@ Access only via Private Endpoints inside the VNet
 
 ---
 
-## 3. Bootstrap & Prerequisites
+## 3. Prerequisites
 
 These steps are performed once by a platform engineer before any Terraform or pipelines run.
 
@@ -174,13 +192,13 @@ az acr replication create \
 2. Create ADO Project       → "platform"
 3. Import the Git repo into ADO Repos
 4. Create Service Connections (use Workload Identity Federation — no client secrets):
-     sc-azure-dev         → ARM → sub-dev
-     sc-azure-staging     → ARM → sub-staging
-     sc-azure-production  → ARM → sub-production
+     sc-azure-dev         → sub-dev
+     sc-azure-staging     → sub-staging
+     sc-azure-production  → sub-production
      sc-acr               → Docker Registry → companyacr
 5. Create Environments:
      dev        → no approval gates
-     staging    → no approval gates
+     staging    → approval gate: testing team must approve
      production → approval gate: 2 of 3 senior engineers must approve
 6. Create Variable Groups linked to Azure Key Vault per environment:
      vg-dev         → kv-dev-<suffix>
@@ -649,7 +667,15 @@ variables:
   - group: vg-staging              # Key Vault-linked: ACR_LOGIN_SERVER
   - name: imageTag
     value: $(Build.SourceVersion)  # Git SHA — immutable, traceable
-
+  - name: containerApp
+    value: ca-api-staging
+  - name: resourceGroup
+    value: rg-app-staging
+  - group: vg-production
+  - name: containerAppPrd
+    value: ca-api-production
+  - name: resourceGroupPrd
+    value: rg-app-production
 stages:
   - stage: BuildAndTest
     displayName: "Build & Test"
@@ -705,32 +731,10 @@ stages:
               tags: |
                 $(imageTag)
                 $(Build.SourceBranchName)-latest
-```
 
-### CD Staging Pipeline — `pipelines/cd-staging.yml`
-
-```yaml
-trigger:
-  branches:
-    include: [main]
-  paths:
-    exclude: [infra/**, docs/**, "*.md"]
-
-pool:
-  vmImage: ubuntu-latest
-
-variables:
-  - group: vg-staging
-  - name: imageTag
-    value: $(Build.SourceVersion)
-  - name: containerApp
-    value: ca-api-staging
-  - name: resourceGroup
-    value: rg-app-staging
-
-stages:
   - stage: DeployStaging
     displayName: "Deploy to Staging"
+    dependsOn: BuildAndTest
     jobs:
       - deployment: Deploy
         environment: staging
@@ -738,7 +742,6 @@ stages:
           runOnce:
             deploy:
               steps:
-
                 - task: AzureCLI@2
                   displayName: "Step 1 — Deploy new revision (old revision keeps traffic)"
                   inputs:
@@ -800,33 +803,10 @@ stages:
               method: POST
               body: |
                 {"text": "🔴 Staging deploy FAILED — $(Build.BuildNumber) — $(Build.SourceVersionMessage)"}
-```
 
-### CD Production Pipeline — `pipelines/cd-production.yml`
-
-```yaml
-trigger:
-  branches:
-    include: [release/*]   # e.g. release/1.2.3
-
-pool:
-  vmImage: ubuntu-latest
-
-variables:
-  - group: vg-production
-  - name: imageTag
-    value: $(Build.SourceVersion)
-  - name: containerApp
-    value: ca-api-production
-  - name: resourceGroup
-    value: rg-app-production
-
-stages:
-
-  # ADO Environment "production" has approval check configured:
-  # 2 of 3 designated approvers must approve before this stage runs
   - stage: Approval
     displayName: "① Awaiting approval (2 engineers required)"
+    dependsOn: DeployStaging
     jobs:
       - deployment: WaitForApproval
         environment: production
@@ -856,14 +836,14 @@ stages:
                     scriptLocation: inlineScript
                     inlineScript: |
                       az containerapp update \
-                        --name $(containerApp) \
-                        --resource-group $(resourceGroup) \
+                        --name $(containerAppPrd) \
+                        --resource-group $(resourceGroupPrd) \
                         --image $(ACR_LOGIN_SERVER)/api:$(imageTag) \
                         --revision-suffix $(Build.BuildId)
 
                       az containerapp ingress traffic set \
-                        --name $(containerApp) \
-                        --resource-group $(resourceGroup) \
+                        --name $(containerAppPrd) \
+                        --resource-group $(resourceGroupPrd) \
                         --revision-weight \
                           $(containerApp)--$(Build.BuildId)=0 \
                           latest=100
@@ -877,8 +857,8 @@ stages:
                     inlineScript: |
                       for i in {1..18}; do
                         STATUS=$(az containerapp revision show \
-                          --name $(containerApp) \
-                          --resource-group $(resourceGroup) \
+                          --name $(containerAppPrd) \
+                          --resource-group $(resourceGroupPrd) \
                           --revision $(containerApp)--$(Build.BuildId) \
                           --query "properties.healthState" -o tsv)
                         [ "$STATUS" = "Healthy" ] && exit 0
@@ -894,8 +874,8 @@ stages:
                     scriptLocation: inlineScript
                     inlineScript: |
                       az containerapp ingress traffic set \
-                        --name $(containerApp) \
-                        --resource-group $(resourceGroup) \
+                        --name $(containerAppPrd) \
+                        --resource-group $(resourceGroupPrd) \
                         --revision-weight \
                           $(containerApp)--$(Build.BuildId)=10 \
                           latest=90
@@ -923,8 +903,8 @@ stages:
                         if [ "${ERROR_RATE:-0}" -gt "50" ]; then
                           echo "Error threshold exceeded — rolling back to previous revision"
                           az containerapp ingress traffic set \
-                            --name $(containerApp) \
-                            --resource-group $(resourceGroup) \
+                            --name $(containerAppPrd) \
+                            --resource-group $(resourceGroupPrd) \
                             --revision-weight latest=100
                           exit 1
                         fi
@@ -939,8 +919,8 @@ stages:
                     scriptLocation: inlineScript
                     inlineScript: |
                       az containerapp ingress traffic set \
-                        --name $(containerApp) \
-                        --resource-group $(resourceGroup) \
+                        --name $(containerAppPrd) \
+                        --resource-group $(resourceGroupPrd) \
                         --revision-weight $(containerApp)--$(Build.BuildId)=100
 
                 - script: |
